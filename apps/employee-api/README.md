@@ -49,6 +49,12 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
+Start PostgreSQL with Docker Compose:
+
+```bash
+docker compose -f ../../docker/docker-compose.yml up -d postgres
+```
+
 Run the app:
 
 ```bash
@@ -72,6 +78,18 @@ http://127.0.0.1:5000/health
 ```bash
 pytest
 ```
+
+Tests use an in-memory SQLite database so they can run without PostgreSQL.
+
+## PostgreSQL Configuration
+
+By default, the app connects to:
+
+```text
+postgresql+psycopg2://employee_user:employee_password@localhost:5432/employee_db
+```
+
+Override it with the `DATABASE_URL` environment variable when needed.
 
 ## API Endpoints
 

@@ -1,19 +1,9 @@
 from flask import Blueprint, current_app, jsonify, request
 
+from app.extensions import db
+from app.models import Employee
+
 api = Blueprint("api", __name__)
-
-
-def get_employees():
-    return current_app.config["EMPLOYEES"]
-
-
-def get_next_id():
-    employees = get_employees()
-
-    if not employees:
-        return 1
-
-    return max(employee["id"] for employee in employees) + 1
 
 
 @api.get("/")
@@ -39,12 +29,12 @@ def health_check():
 
 @api.get("/employees")
 def list_employees():
-    employees = get_employees()
+    employees = Employee.query.order_by(Employee.id).all()
 
     return jsonify(
         {
             "count": len(employees),
-            "employees": employees,
+            "employees": [employee.to_dict() for employee in employees],
         }
     ), 200
 
@@ -74,46 +64,32 @@ def create_employee():
     if salary <= 0:
         return jsonify({"error": "Salary must be greater than 0"}), 400
 
-    employee = {
-        "id": get_next_id(),
-        "name": name,
-        "department": department,
-        "salary": salary,
-    }
+    employee = Employee(name=name, department=department, salary=salary)
 
-    get_employees().append(employee)
+    db.session.add(employee)
+    db.session.commit()
 
     return jsonify(
         {
             "message": "Employee created successfully",
-            "employee": employee,
+            "employee": employee.to_dict(),
         }
     ), 201
 
 
 @api.get("/employees/<int:employee_id>")
 def get_employee(employee_id):
-    employees = get_employees()
-
-    employee = next(
-        (employee for employee in employees if employee["id"] == employee_id),
-        None,
-    )
+    employee = db.session.get(Employee, employee_id)
 
     if not employee:
         return jsonify({"error": "Employee not found"}), 404
 
-    return jsonify(employee), 200
+    return jsonify(employee.to_dict()), 200
 
 
 @api.put("/employees/<int:employee_id>")
 def update_employee(employee_id):
-    employees = get_employees()
-
-    employee = next(
-        (employee for employee in employees if employee["id"] == employee_id),
-        None,
-    )
+    employee = db.session.get(Employee, employee_id)
 
     if not employee:
         return jsonify({"error": "Employee not found"}), 404
@@ -123,12 +99,12 @@ def update_employee(employee_id):
     if "name" in data:
         if not data["name"]:
             return jsonify({"error": "Name cannot be empty"}), 400
-        employee["name"] = data["name"]
+        employee.name = data["name"]
 
     if "department" in data:
         if not data["department"]:
             return jsonify({"error": "Department cannot be empty"}), 400
-        employee["department"] = data["department"]
+        employee.department = data["department"]
 
     if "salary" in data:
         try:
@@ -139,29 +115,27 @@ def update_employee(employee_id):
         if salary <= 0:
             return jsonify({"error": "Salary must be greater than 0"}), 400
 
-        employee["salary"] = salary
+        employee.salary = salary
+
+    db.session.commit()
 
     return jsonify(
         {
             "message": "Employee updated successfully",
-            "employee": employee,
+            "employee": employee.to_dict(),
         }
     ), 200
 
 
 @api.delete("/employees/<int:employee_id>")
 def delete_employee(employee_id):
-    employees = get_employees()
-
-    employee = next(
-        (employee for employee in employees if employee["id"] == employee_id),
-        None,
-    )
+    employee = db.session.get(Employee, employee_id)
 
     if not employee:
         return jsonify({"error": "Employee not found"}), 404
 
-    employees.remove(employee)
+    db.session.delete(employee)
+    db.session.commit()
 
     return jsonify(
         {
